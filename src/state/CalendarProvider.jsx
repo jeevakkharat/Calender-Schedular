@@ -40,28 +40,6 @@ function reducer(state, action) {
       if (!command) return state
       return { ...state, events: command.after, past: [...state.past, command], future: state.future.slice(1) }
     }
-    case 'rollback': {
-      const restore = (list) => {
-        const matching = list.find((event) => event.id === action.eventId)
-        if (action.failedAfter && matching && JSON.stringify(matching) === JSON.stringify(action.failedAfter)) {
-          return list.map((event) => event.id === action.eventId ? action.failedBefore : event).filter(Boolean)
-        }
-        if (!action.failedAfter && action.failedBefore && !matching) return [...list, action.failedBefore]
-        return list
-      }
-      const remapHistory = (commands) => commands.map((command) => ({
-        ...command,
-        before: restore(command.before),
-        after: restore(command.after),
-      }))
-      return {
-        ...state,
-        events: restore(state.events),
-        past: remapHistory(state.past),
-        future: remapHistory(state.future),
-        sync: { ...state.sync, [action.id]: 'failed' },
-      }
-    }
     case 'sync-status':
       return { ...state, sync: { ...state.sync, [action.id]: action.status } }
     case 'seed':
@@ -100,7 +78,7 @@ export function CalendarProvider({ children }) {
     if (state.events.length || seedRequested.current) return
     seedRequested.current = true
     eventService.seed().then((todos) => {
-      const monday = startOfWeek(new Date(2026, 8, 28))
+      const monday = startOfWeek(new Date())
       const seeded = todos.map((todo, index) => {
         const dayOffset = (todo.id * 7 + todo.userId * 3) % 21
         const hour = 8 + ((todo.id * 5 + todo.userId) % 10)
@@ -136,20 +114,11 @@ export function CalendarProvider({ children }) {
     const action = syncAction || eventActionFor(before, after)
     const performSync = async () => {
       try {
-        if (Math.random() < 0.2) throw new Error('Temporary sync failure. Your browser copy will be restored.')
         await eventService.sync(changed, action)
         dispatch({ type: 'sync-status', id, status: 'saved' })
       } catch (error) {
-        console.error('Calendar sync failed; reverting this change where it has not been superseded.', error)
-        const failedBefore = before.find((item) => item.id === changed.id) || null
-        const failedAfter = after.find((item) => item.id === changed.id) || null
-        dispatch({
-          type: 'rollback',
-          id,
-          eventId: changed.id,
-          failedBefore,
-          failedAfter,
-        })
+        console.error('DummyJSON could not save this event; keeping the browser copy.', error)
+        dispatch({ type: 'sync-status', id, status: 'failed' })
       }
     }
     performSync()

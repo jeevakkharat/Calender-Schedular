@@ -5,7 +5,6 @@ import { useCalendarStore } from './state/useCalendarStore'
 import { TIMEZONES, useCalendar } from './hooks/useCalendar'
 import { useDragInteraction } from './hooks/useDragInteraction'
 import { useHistory } from './hooks/useHistory'
-import { authService } from './services/authService'
 import { userService } from './services/userService'
 import { DAY, addDays, dateKey, expandEvents, formatTime, layoutOverlaps, parseDate, snapDate, startOfWeek } from './utils/calendar'
 import './App.css'
@@ -13,6 +12,7 @@ import './App.css'
 const COLOR_CLASS = { blue: 'event-blue', violet: 'event-violet', teal: 'event-teal', amber: 'event-amber', rose: 'event-rose' }
 const HOURS = Array.from({ length: 24 }, (_, index) => index)
 const displayPartsCache = new Map()
+const CALENDAR_OWNER = { id: 1, firstName: 'My', lastName: 'Calendar', username: 'calendar' }
 
 function useDialogKeyboard(dialogRef, onClose) {
   useEffect(() => {
@@ -40,58 +40,8 @@ function useDialogKeyboard(dialogRef, onClose) {
   }, [dialogRef, onClose])
 }
 
-function Login({ onLogin }) {
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
-  const [busy, setBusy] = useState(false)
-  const submitting = useRef(false)
-
-  async function submit(event) {
-    event.preventDefault()
-    if (submitting.current) return
-    submitting.current = true
-    setBusy(true)
-    setError('')
-    try {
-      const user = await authService.login(username.trim(), password)
-      onLogin(user)
-    } catch (apiError) {
-      setError(apiError.message || 'Those details did not match a DummyJSON user.')
-    } finally {
-      submitting.current = false
-      setBusy(false)
-    }
-  }
-
-  return (
-    <main className="login-screen">
-      <section className="login-card">
-        <div className="login-mark"><CalendarIcon /></div>
-        <span className="eyebrow">CALENDAR / PERSONAL</span>
-        <h1>Your time,<br /><em>beautifully</em> arranged.</h1>
-        <p className="login-copy">Sign in to open your calendar and make room for what matters.</p>
-        <form onSubmit={submit} className="login-form">
-          <label>Username<input autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} required placeholder="e.g. emilys" /></label>
-          <label>Password<input autoComplete="current-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder="Your password" /></label>
-          {error && <div role="alert" className="form-error">{error}</div>}
-          <button className="primary-button login-submit" disabled={busy}>{busy ? <><span className="spinner" /> Signing in</> : <>Enter your calendar <span>↗</span></>}</button>
-        </form>
-        <p className="login-foot">Demo powered by <a href="https://dummyjson.com/users" target="_blank" rel="noreferrer">DummyJSON users</a>. Try <b>emilys</b> / <b>emilyspass</b>.</p>
-      </section>
-      <aside className="login-art">
-        <div className="art-glow" />
-        <div className="art-note note-one"><span>MON · 09:30</span><b>Product sync</b><small>Studio meeting room</small></div>
-        <div className="art-note note-two"><span>WED · 14:00</span><b>Design review</b><small>With 3 people</small></div>
-        <div className="art-note note-three"><span>FRI · 16:15</span><b>A little breathing room</b><small>Just for you</small></div>
-        <div className="art-caption">A calmer way to<br />see the week ahead.</div>
-        <div className="art-orbit orbit-one" /><div className="art-orbit orbit-two" />
-      </aside>
-    </main>
-  )
-}
-
-function CalendarApp({ user, onLogout }) {
+function CalendarApp() {
+  const user = CALENDAR_OWNER
   const { events, sync, commit } = useCalendarStore()
   const { canUndo, canRedo, undo, redo } = useHistory()
   const eventsRef = useRef(events)
@@ -395,18 +345,18 @@ function CalendarApp({ user, onLogout }) {
   }
 
   return (
-    <div className="app-shell" onKeyDown={handleGridKey}>
-      <header className="topbar">
+    <div className="app-shell min-h-screen bg-slate-50 text-slate-900" onKeyDown={handleGridKey}>
+      <header className="topbar sticky top-0 z-10">
         <Link to="/" className="brand"><span className="brand-icon"><CalendarIcon /></span><span>daymark<span className="brand-dot">.</span></span></Link>
         <div className="topbar-center"><span className="status-pulse" /> Your personal calendar</div>
         <div className="topbar-actions">
           <button className="icon-button" title="Undo (Ctrl+Z)" aria-label="Undo" disabled={!canUndo} onClick={undo}>↶</button>
           <button className="icon-button" title="Redo (Ctrl+Shift+Z)" aria-label="Redo" disabled={!canRedo} onClick={redo}>↷</button>
           <span className="topbar-divider" />
-          <button className="avatar-button" title="Sign out" onClick={onLogout}>{user.firstName?.[0] || user.username?.[0] || 'U'}</button>
+          <span className="avatar-button" aria-label="Personal calendar">M</span>
         </div>
       </header>
-      <div className="workspace">
+      <div className="workspace flex">
         <aside className="sidebar">
           <button className="primary-button create-button" onClick={() => setModal({ type: 'create', event: blankEvent(user.id) })}><span>＋</span> Create event</button>
           <div className="mini-calendar">
@@ -427,9 +377,9 @@ function CalendarApp({ user, onLogout }) {
           </div>
           <div className="side-spacer" />
           <div className="sidebar-tip"><div className="tip-icon">✳</div><b>Make space for focus.</b><p>Drag anywhere in your week to add a new moment.</p></div>
-          <div className="sidebar-profile"><img src={user.image || `https://dummyjson.com/icon/${user.username}/64`} alt="" /><span><b>{user.firstName} {user.lastName}</b><small>Personal calendar</small></span><button onClick={onLogout} title="Sign out">↗</button></div>
+          <div className="sidebar-profile"><span className="profile-avatar" aria-hidden="true">M</span><span><b>My calendar</b><small>Personal calendar</small></span></div>
         </aside>
-        <main className="calendar-main">
+        <main className="calendar-main min-w-0 flex-1">
           <div className="calendar-toolbar">
             <div className="toolbar-title"><h1>{heading}</h1><div className="date-nav"><button onClick={() => navigateDate(-1)} aria-label="Previous">‹</button><button onClick={() => navigateDate(1)} aria-label="Next">›</button><button className="today-button" onClick={() => navigateDate('today')}>Today</button></div></div>
             <div className="toolbar-controls">
@@ -775,25 +725,11 @@ function CalendarIcon() {
   return <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3" stroke="currentColor" strokeWidth="1.7" /><path d="M7.5 3v4M16.5 3v4M3.5 10h17M8 14h2M14 14h2M8 17h2" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" /></svg>
 }
 
-function AppContent() {
-  const [user, setUser] = useState(null)
-  const [checking, setChecking] = useState(() => authService.hasSession())
-  useEffect(() => {
-    if (authService.hasSession()) authService.me().then(setUser).catch((error) => {
-      console.error('Session restore failed.', error)
-      authService.logout()
-    }).finally(() => setChecking(false))
-    const expire = () => setUser(null)
-    const storage = (event) => { if (event.key === 'calendar.accessToken' && !event.newValue) setUser(null) }
-    window.addEventListener('calendar:session-expired', expire)
-    window.addEventListener('storage', storage)
-    return () => { window.removeEventListener('calendar:session-expired', expire); window.removeEventListener('storage', storage) }
-  }, [])
-  const logout = useCallback(() => { authService.logout(); setUser(null) }, [])
-  if (checking) return <div className="loading-screen"><div className="login-mark"><CalendarIcon /></div><span>Opening your calendar…</span></div>
-  return user ? <CalendarApp user={user} onLogout={logout} /> : <Login onLogin={setUser} />
-}
-
 export default function App() {
-  return <BrowserRouter><CalendarProvider><AppContent /></CalendarProvider></BrowserRouter>
+  useEffect(() => {
+    localStorage.removeItem('calendar.accessToken')
+    localStorage.removeItem('calendar.refreshToken')
+  }, [])
+
+  return <BrowserRouter><CalendarProvider><CalendarApp /></CalendarProvider></BrowserRouter>
 }
